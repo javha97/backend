@@ -1,37 +1,45 @@
 const express = require('express')
 const db = require('./firebase')
-const cors=require('cors')
+const cors = require('cors')
 const app = express()
 const port = 8080;
 app.use(express.json())
 app.use(cors())
-///add product  
+///create product  
 app.post('/products', async (req, res) => {
     const data = req.query;
-    db.collection('products').add(data)
+    const docRef = await db.collection('products').add(data)
     console.log(data);
-    res.send('created')
+    res.send({
+        id: docRef.id,
+        ...data
+    })
 })
 
+//get all products
 app.get('/', async (req, res) => {
     const data = await db.collection('products').get()
-    const products = data.docs.map((doc) => doc.data())
-    res.send(products)
+    let arr = []
+    data.forEach((doc) => {
+        arr.push({id:doc.id, ...doc.data()})
+    })
+    console.log(arr);
+    res.send(arr)
 })
 ///product detail
-app.get('/products:id', async (req, res) => {
+app.get('/products/:id', async (req, res) => {
     const get = await db.collection('products').get()
-    const id = Object.values(req.params)
-    const data = get.docs.map((doc) => doc.data())
-    console.log(data);
-    const myid = data.filter((el) => {
-        return id[0] === el.id
+    const id = req.params.id
+    const myarr = []
+    get.docs.filter((doc) => {
+        if (doc.id === id) {
+            myarr.push(doc.data())
+        }
     })
-
-    res.send(myid)
+    res.send(myarr)
 })
-///catch products by using categoryId
-app.get('/category:categoryId', async (req, res) => {
+///get products by using categoryId
+app.get('/category/:categoryId', async (req, res) => {
     const get = await db.collection('products').get()
     const data = get.docs.map((doc) => doc.data())
     const filter = data.filter((el) => {
@@ -39,29 +47,35 @@ app.get('/category:categoryId', async (req, res) => {
     })
     res.send(filter)
 })
-app.patch('/products:id',async(req,res)=>{
-    const get=await db.collection('products').get()
-    const data=get.docs.map((doc)=>doc.data())
-    const filter=data.filter((el)=>{
-        return req.params.id===el.id
+///edit product
+app.patch('/products/:id', async (req, res) => {
+    const get = await db.collection('products').get()
+    let arr
+    get.docs.filter((doc) => {
+        if (doc.id === req.params.id) {
+            arr = doc.id
+        }
     })
-    console.log(filter);
-    res.send('successfully deleted')
+    const data = req.query
+    db.collection('products').doc(req.params.id).set(data, { merge: true })
+    console.log(arr);
+    const mydata = await db.collection('products').doc(arr).get()
+    res.send(mydata.data())
 })
 ///delete product
-app.delete('/products:id', async (req, res) => {
+app.delete('/products/:id', async (req, res) => {
     const get = await db.collection('products').get()
-    let arr = []
-    const mydata = get.forEach((el) => {
-        return arr.push({ data: el.data(), id: el.id })
+    let arr
+    get.forEach((doc) => {
+        if (doc.id === req.params.id) {
+            arr = (doc.id)
+        }
     });
-    const filtered = arr.filter((el) => {
-        return req.params.id === el.data.id
-    })
-    db.collection('products').doc(filtered[0].id).delete()
+    console.log(arr);
+    db.collection('products').doc(arr).delete()
     res.send('successfully deleted')
 })
-app.post('/category',async(req,res)=>{
+app.post('/category', async (req, res) => {
     db.collection('category').add(req.query)
     res.send('created')
 })
