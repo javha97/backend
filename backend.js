@@ -21,7 +21,7 @@ app.get('/', async (req, res) => {
     const data = await db.collection('products').get()
     let arr = []
     data.forEach((doc) => {
-        arr.push({id:doc.id, ...doc.data()})
+        arr.push({ id: doc.id, ...doc.data() })
     })
     console.log(arr);
     res.send(arr)
@@ -40,12 +40,19 @@ app.get('/products/:id', async (req, res) => {
 })
 ///get products by using categoryId
 app.get('/category/:categoryId', async (req, res) => {
+    console.log(req.params.categoryId);
+    let myarr = []
     const get = await db.collection('products').get()
-    const data = get.docs.map((doc) => doc.data())
-    const filter = data.filter((el) => {
-        return req.params.categoryId === el.categoryId
+    get.docs.map((doc) => {
+        myarr.push({ id: doc.id, ...doc.data() })
     })
-    res.send(filter)
+    let arr = []
+    for (let el of myarr) {
+        if (el.categoryId.includes(req.params.categoryId)) {
+            arr.push(el)
+        }
+    }
+    res.send(arr)
 })
 ///edit product
 app.patch('/products/:id', async (req, res) => {
@@ -76,9 +83,12 @@ app.delete('/products/:id', async (req, res) => {
     res.send('successfully deleted')
 })
 app.post('/category', async (req, res) => {
-    db.collection('category').add(req.query)
+    await db.collection('category').add(req.body.params)
     res.send('created')
 })
 app.listen(port, () => {
     console.log('lmao');
+})
+app.use('*',(req,res)=>{
+    res.status(404).send('Page not found')
 })
