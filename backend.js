@@ -1,21 +1,60 @@
 const express = require('express')
+const crypto = require('crypto')
 const db = require('./firebase')
 const cors = require('cors')
 const app = express()
 const port = 8080;
 app.use(express.json())
 app.use(cors())
+////isAuthenticated
+const isAuthenticated = async (req, res, next) => {
+    const mytoken = req.headers.token
+    const docs = await db.collection('token').doc(mytoken).get()
+    if (docs === undefined) {
+        return res.send([])
+    }
+    next()
+}
+///login
+app.post('/login', async (req, res) => {
+    const { username, password } = req.headers
+    const data = await db.collection('users').doc(username).get()
+    if (data.data() === undefined) {
+        return res.send('Wrong password or username!')
+    }
+    const hash = crypto.createHash('sha256').update(password).digest('hex');
+    if (hash !== data.data().password) {
+        return res.send('Wrong password!')
+    }
+    const token = crypto.randomUUID()
+    db.collection('token').doc(token).set({
+        user: data.id,
+        expiredate: new Date(Date.now() + 5 * 60 * 1000),
+    })
+    console.log(token);
+    res.send(token)
+})
+///register
+app.post('/register', async (req, res) => {
+    const { username, password } = req.headers
+    const data = await db.collection('users').doc(username).get()
+    if (data.data() !== undefined) {
+        return res.send('This username exists')
+    }
+    const hashedPassword = crypto.createHash('sha256').update(password).digest('hex');
+    await db.collection('users').doc(username).set({ password: hashedPassword })
+    res.send({ success: true })
+})
+
 ///create product  
-app.post('/products', async (req, res) => {
+app.post('/products', isAuthenticated, async (req, res) => {
     const data = req.query;
     const docRef = await db.collection('products').add(data)
-    console.log(data);
     res.send({
         id: docRef.id,
         ...data
     })
 })
-
 //get all products
 app.get('/', async (req, res) => {
     const data = await db.collection('products').get()
@@ -23,7 +62,6 @@ app.get('/', async (req, res) => {
     data.forEach((doc) => {
         arr.push({ id: doc.id, ...doc.data() })
     })
-    console.log(arr);
     res.send(arr)
 })
 ///product detail
@@ -89,6 +127,6 @@ app.post('/category', async (req, res) => {
 app.listen(port, () => {
     console.log('lmao');
 })
-app.use('*',(req,res)=>{
+app.use('*', (req, res) => {
     res.status(404).send('Page not found')
 })
