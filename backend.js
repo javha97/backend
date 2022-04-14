@@ -6,6 +6,29 @@ const app = express()
 const port = 8080;
 app.use(express.json())
 app.use(cors())
+const time=(new Date).getTime()/1000
+////token cleaner
+const tokencleaner = async (req,res,next) => {
+    const docs = await db.collection('token').get()
+    docs.forEach((doc) => {
+        if (doc.expiredate <= time) {
+            db.collection('token').doc(doc).delete()
+        }
+    })
+    next()
+}
+
+/////errorhandler
+const errorhandler = (fn) => {
+    return async (req, res, next) => {
+        try {
+            return await fn(req, res, next)
+        } catch (e) {
+            next()
+        }
+    }
+}
+
 ////isAuthenticated
 const isAuthenticated = async (req, res, next) => {
     const mytoken = req.headers.token
@@ -13,10 +36,13 @@ const isAuthenticated = async (req, res, next) => {
     if (docs === undefined) {
         return res.send([])
     }
+    if (docs.data().expiredate.seconds <= time) {
+        return res.status(403).send([]);
+    }
     next()
 }
-///login
-app.post('/login', async (req, res) => {
+////login
+app.post('/login', tokencleaner, errorhandler(async (req, res) => {
     const { username, password } = req.headers
     const data = await db.collection('users').doc(username).get()
     if (data.data() === undefined) {
@@ -33,7 +59,7 @@ app.post('/login', async (req, res) => {
     })
     console.log(token);
     res.send(token)
-})
+}))
 ///register
 app.post('/register', async (req, res) => {
     const { username, password } = req.headers
@@ -43,18 +69,25 @@ app.post('/register', async (req, res) => {
     }
     const hashedPassword = crypto.createHash('sha256').update(password).digest('hex');
     await db.collection('users').doc(username).set({ password: hashedPassword })
-    res.send({ success: true })
+    res.send('Created your account')
 })
 
 ///create product  
-app.post('/products', isAuthenticated, async (req, res) => {
+app.post('/products', isAuthenticated, errorhandler(async (req, res) => {
     const data = req.query;
+    console.log(data);
+    let value = Object.values(data)
+    value.forEach((el) => {
+        if (!el) {
+            return res.send([])
+        }
+    })
     const docRef = await db.collection('products').add(data)
     res.send({
         id: docRef.id,
         ...data
     })
-})
+}))
 //get all products
 app.get('/', async (req, res) => {
     const data = await db.collection('products').get()
@@ -65,7 +98,7 @@ app.get('/', async (req, res) => {
     res.send(arr)
 })
 ///product detail
-app.get('/products/:id', async (req, res) => {
+app.get('/products/:id', errorhandler(async (req, res) => {
     const get = await db.collection('products').get()
     const id = req.params.id
     const myarr = []
@@ -75,9 +108,9 @@ app.get('/products/:id', async (req, res) => {
         }
     })
     res.send(myarr)
-})
+}))
 ///get products by using categoryId
-app.get('/category/:categoryId', async (req, res) => {
+app.get('/category/:categoryId', errorhandler(async (req, res) => {
     console.log(req.params.categoryId);
     let myarr = []
     const get = await db.collection('products').get()
@@ -91,9 +124,9 @@ app.get('/category/:categoryId', async (req, res) => {
         }
     }
     res.send(arr)
-})
+}))
 ///edit product
-app.patch('/products/:id', async (req, res) => {
+app.patch('/products/:id', errorhandler(async (req, res) => {
     const get = await db.collection('products').get()
     let arr
     get.docs.filter((doc) => {
@@ -106,7 +139,7 @@ app.patch('/products/:id', async (req, res) => {
     console.log(arr);
     const mydata = await db.collection('products').doc(arr).get()
     res.send(mydata.data())
-})
+}))
 ///delete product
 app.delete('/products/:id', async (req, res) => {
     const get = await db.collection('products').get()
@@ -120,10 +153,10 @@ app.delete('/products/:id', async (req, res) => {
     db.collection('products').doc(arr).delete()
     res.send('successfully deleted')
 })
-app.post('/category', async (req, res) => {
+app.post('/category', errorhandler(async (req, res) => {
     await db.collection('category').add(req.body.params)
     res.send('created')
-})
+}))
 app.listen(port, () => {
     console.log('lmao');
 })
