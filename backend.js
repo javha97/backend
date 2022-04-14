@@ -4,11 +4,12 @@ const db = require('./firebase')
 const cors = require('cors')
 const app = express()
 const port = 8080;
+const fs = require('fs')
 app.use(express.json())
 app.use(cors())
-const time=(new Date).getTime()/1000
+const time = (new Date).getTime() / 1000
 ////token cleaner
-const tokencleaner = async (req,res,next) => {
+const tokencleaner = async (req, res, next) => {
     const docs = await db.collection('token').get()
     docs.forEach((doc) => {
         if (doc.expiredate <= time) {
@@ -58,7 +59,7 @@ app.post('/login', tokencleaner, errorhandler(async (req, res) => {
         expiredate: new Date(Date.now() + 5 * 60 * 1000),
     })
     console.log(token);
-    res.send(token)
+    res.status(200).send(token)
 }))
 ///register
 app.post('/register', async (req, res) => {
@@ -76,6 +77,8 @@ app.post('/register', async (req, res) => {
 app.post('/products', isAuthenticated, errorhandler(async (req, res) => {
     const data = req.query;
     console.log(data);
+   const a= (data.img).split(' ').join('')
+   console.log(a);
     let value = Object.values(data)
     value.forEach((el) => {
         if (!el) {
@@ -87,6 +90,7 @@ app.post('/products', isAuthenticated, errorhandler(async (req, res) => {
         id: docRef.id,
         ...data
     })
+    res.send('m')
 }))
 //get all products
 app.get('/', async (req, res) => {
