@@ -47,18 +47,17 @@ app.post('/login', tokencleaner, errorhandler(async (req, res) => {
     const { username, password } = req.headers
     const data = await db.collection('users').doc(username).get()
     if (data.data() === undefined) {
-        return res.send('Wrong password or username!')
+        return res.status(400).send('Wrong password or username!')
     }
     const hash = crypto.createHash('sha256').update(password).digest('hex');
     if (hash !== data.data().password) {
-        return res.send('Wrong password!')
+        return res.status(400).send('Wrong password!')
     }
     const token = crypto.randomUUID()
     db.collection('token').doc(token).set({
         user: data.id,
         expiredate: new Date(Date.now() + 5 * 60 * 1000),
     })
-    console.log(token);
     res.status(200).send(token)
 }))
 ///register
@@ -76,30 +75,52 @@ app.post('/register', async (req, res) => {
 ///create product  
 app.post('/products', isAuthenticated, errorhandler(async (req, res) => {
     const data = req.query;
-    console.log(data);
-   const a= (data.img).split(' ').join('')
-   console.log(a);
+    const base64 = req.headers.img
+    const myrandom = Math.random() * 1000
+    const myimg = base64.split('base64,').pop('')
+    const replace = myimg.replace(/ /g, '+');
+    const imgaebuffer = new Buffer.from(replace, 'base64')
+    fs.writeFileSync(`public/${myrandom}.jpeg`, imgaebuffer)
     let value = Object.values(data)
     value.forEach((el) => {
         if (!el) {
             return res.send([])
         }
     })
-    const docRef = await db.collection('products').add(data)
-    res.send({
-        id: docRef.id,
+    const docRef = await db.collection('products').add({
+        img: myrandom,
         ...data
     })
-    res.send('m')
+    res.send({
+        id: docRef.id,
+        img: myrandom,
+        ...data
+    })
 }))
 //get all products
 app.get('/', async (req, res) => {
     const data = await db.collection('products').get()
-    let arr = []
+    let myspecialarr = []
+    const dir = 'public'
+    const files = fs.readdirSync(dir)
     data.forEach((doc) => {
-        arr.push({ id: doc.id, ...doc.data() })
+        for (const file of files) {
+            const removed = file.slice(0, -5)
+            if (doc.data().img === Number(removed)) {
+                const a = fs.readFileSync(`./public/${removed}.jpeg`, 'base64')
+                myspecialarr.push({
+                    img: a,
+                    description: doc.data().description,
+                    price: doc.data().price,
+                    name: doc.data().name,
+                    categoryId: doc.data().categoryId,
+                    id: doc.id
+                })
+
+            }
+        }
     })
-    res.send(arr)
+    res.send(myspecialarr)
 })
 ///product detail
 app.get('/products/:id', errorhandler(async (req, res) => {
@@ -146,6 +167,7 @@ app.patch('/products/:id', errorhandler(async (req, res) => {
 }))
 ///delete product
 app.delete('/products/:id', async (req, res) => {
+    console.log(req.params.id);
     const get = await db.collection('products').get()
     let arr
     get.forEach((doc) => {
@@ -153,7 +175,6 @@ app.delete('/products/:id', async (req, res) => {
             arr = (doc.id)
         }
     });
-    console.log(arr);
     db.collection('products').doc(arr).delete()
     res.send('successfully deleted')
 })
