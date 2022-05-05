@@ -34,7 +34,7 @@ app.post('/products', tokencleaner, isAdmin, errorhandler(async (req, res) => {
         }
     })
     const docRef = await db.collection('products').add({
-       img: myrandom,
+        img: myrandom,
         ...data
     })
     res.send({
@@ -48,10 +48,11 @@ app.get('/', async (req, res) => {
     const data = await db.collection('products').get()
     let myspecialarr = []
     data.forEach((doc) => {
-                myspecialarr.push({
-                    id: doc.id,
-                    ...doc.data()
-                })
+        myspecialarr.push({
+            id: doc.id,
+            image: `http://localhost:8080/${doc.data().img}.jpeg`,
+            ...doc.data()
+        })
     })
     res.send(myspecialarr)
 })
